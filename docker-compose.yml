@@ -1,0 +1,23 @@
+
+services:
+  mysql_db:  # 容器名必须为 mysql_db（与测试代码对应）
+    image: mysql:8.0  # 使用 MySQL 8.0 镜像（兼容性好）
+    container_name: mysql_db
+    restart: no  # 不自动重启（方便测试停库场景）
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456  # 数据库密码（Flask 配置需一致）
+      MYSQL_DATABASE: order_db     # Flask 服务使用的数据库名
+      MYSQL_USER: test_user        # 非 root 账号（可选，增强安全性）
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3306:3306"  # 映射端口到本地，方便 Flask 连接
+    volumes:
+      - mysql_data:/var/lib/mysql  # 持久化数据（避免容器删除后数据丢失）
+    healthcheck:  # 健康检查（判断数据库是否启动成功）
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u$MYSQL_USER", "-p$MYSQL_PASSWORD"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:  # 定义数据卷，持久化 MySQL 数据

@@ -1,6 +1,6 @@
 def password(lst):
     if len(lst) == 0: return False
-    if len(lst) <=6&len(lst)>=15: return True
+    if len(lst) <=6&len(lst)>=15: return False
     return lst.isalnum()
 
 def test_answer():
