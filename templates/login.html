@@ -2,44 +2,203 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>登录</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录界面（对接本地后端）</title>
     <style>
-        .container { width: 300px; margin: 100px auto; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; }
-        input { width: 100%; padding: 8px; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #007bff; color: white; border: none; cursor: pointer; }
-        .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
-        .success { background: #d4edda; color: #155724; }
-        .danger { background: #f8d7da; color: #721c24; }
-        .warning { background: #fff3cd; color: #856404; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .login-box {
+            background-color: #fff;
+            padding: 40px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 350px;
+        }
+
+        .login-box h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 22px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+
+        .form-group input {
+            width: 100%;
+            height: 44px;
+            padding: 0 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #1677ff;
+        }
+
+        /* 登录按钮（添加加载状态样式） */
+        .login-btn {
+            width: 100%;
+            height: 44px;
+            background-color: #1677ff;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        .login-btn:disabled {
+            background-color: #8cc5ff;
+            cursor: not-allowed;
+        }
+
+        /* 提示信息（区分成功/错误） */
+        .tip {
+            font-size: 12px;
+            text-align: center;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-tip {
+            color: #f5222d;
+        }
+
+        .success-tip {
+            color: #52c41a;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="login-box">
         <h2>用户登录</h2>
-        
-        <!-- 显示提示信息（如登录成功/失败） -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-            {% if messages %}
-                {% for category, message in messages %}
-                    <div class="alert {{ category }}">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-        
-        <!-- 登录表单：提交到/login路由，使用POST方法 -->
-        <form method="POST" action="{{ url_for('login') }}">
+        <form id="loginForm">
             <div class="form-group">
-                <label for="username">用户名</label>
-                <input type="text" id="username" name="username" required>
+                <label for="username">账号</label>
+                <input type="text" id="username" placeholder="请输入账号" required>
             </div>
             <div class="form-group">
                 <label for="password">密码</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" placeholder="请输入密码" required>
             </div>
-            <button type="submit">登录</button>
+            <!-- 登录按钮（可显示加载中） -->
+            <button type="submit" class="login-btn" id="loginBtn">登录</button>
+            <!-- 提示信息 -->
+            <div class="tip error-tip" id="errorTip">账号或密码错误，请重新输入</div>
+            <div class="tip success-tip" id="successTip">登录成功！即将跳转首页...</div>
         </form>
     </div>
+
+    <script>
+        // 1. 获取DOM元素
+        const loginForm = document.getElementById('loginForm');
+        const usernameInput = document.getElementById('username');
+        const passwordInput = document.getElementById('password');
+        const loginBtn = document.getElementById('loginBtn');
+        const errorTip = document.getElementById('errorTip');
+        const successTip = document.getElementById('successTip');
+
+        // 2. 本地后端登录接口地址（需与你的后端接口一致！）
+        // 示例：Flask后端通常是 http://127.0.0.1:5000/login
+        // 示例：Django后端通常是 http://127.0.0.1:8000/api/login
+        const LOCAL_BACKEND_URL = 'http://127.0.0.1:5000/login'; // 请修改为你的后端接口地址
+
+        // 3. 表单提交事件（核心：与后端交互）
+        loginForm.addEventListener('submit', async function(e) {
+            e.preventDefault(); // 阻止表单默认刷新行为
+
+            // 3.1 隐藏所有提示，禁用按钮（防止重复提交）
+            hideAllTips();
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登录中...';
+
+            // 3.2 获取用户输入的账号密码
+            const userData = {
+                username: usernameInput.value.trim(),
+                password: passwordInput.value.trim()
+            };
+
+            try {
+                // 3.3 发送POST请求到本地后端（核心交互步骤）
+                const response = await fetch(LOCAL_BACKEND_URL, {
+                    method: 'POST', // 请求方法：POST（提交数据）
+                    headers: {
+                        'Content-Type': 'application/json', // 告诉后端，发送的是JSON格式数据
+                        // 若后端需要跨域（CORS），可能需要额外设置（如携带token等，初期可先不加）
+                    },
+                    body: JSON.stringify(userData) // 将账号密码转为JSON字符串发送
+                });
+
+                // 3.4 处理后端返回的结果（需与后端返回格式匹配！）
+                // 后端通常返回JSON格式，如：{ "code": 200, "msg": "success" } 或 { "code": 400, "msg": "error" }
+                const result = await response.json();
+
+                // 3.5 根据后端返回的code/状态判断登录结果
+                if (response.ok && result.code === 200) { // 后端返回“成功”（示例逻辑，需与你的后端一致）
+                    showSuccess(); // 显示成功提示，跳转首页
+                } else { // 后端返回“失败”（如账号密码错误）
+                    showError(); // 显示错误提示
+                }
+
+            } catch (error) {
+                // 3.6 捕获网络错误（如后端没启动、接口地址错误）
+                console.error('与后端通信失败：', error);
+                showError('网络错误，请检查后端是否已启动');
+            } finally {
+                // 3.7 无论成功/失败，都恢复按钮状态
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        });
+
+        // 4. 辅助函数：显示错误提示
+        function showError(customMsg = '') {
+            errorTip.textContent = customMsg || '账号或密码错误，请重新输入';
+            errorTip.style.display = 'block';
+        }
+
+        // 5. 辅助函数：显示成功提示并跳转首页
+        function showSuccess() {
+            successTip.style.display = 'block';
+            // 2秒后跳转到首页（实际项目中替换为你的首页地址）
+            setTimeout(() => {
+                window.location.href = 'http://127.0.0.1:5000/home'; // 请修改为你的后端首页地址
+            }, 2000);
+        }
+
+        // 6. 辅助函数：隐藏所有提示
+        function hideAllTips() {
+            errorTip.style.display = 'none';
+            successTip.style.display = 'none';
+        }
+    </script>
 </body>
 </html>

@@ -3,6 +3,7 @@ import time
 from flask import Flask, request, jsonify, render_template, redirect, url_for, session, flash
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
+import requests
 app = Flask(__name__)
 # 模拟库存
 app.secret_key = 'your_secret_key_here'
@@ -77,29 +78,39 @@ def index():
 # 登录页面路由（支持GET和POST方法）
 USER_DATA = {
     'admin': '123456',  # 用户名: 密码（实际需加密存储）
-    'user1': 'abc123'
+    'user1': 'abc123',
+    'test_user': 'test_pass123'
 }
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         # 获取表单提交的用户名和密码
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
+        data=request.get_json()
+        username = data.get('username', '').strip()  # 获取账号，去除前后空格
+        password = data.get('password', '').strip()  # 获取密码
+        print(username, password)
         # 验证用户信息
         if username in USER_DATA and USER_DATA[username] == password:
+            print(3)
             # 登录成功：将用户名存入session
             session['username'] = username
             flash('登录成功！', 'success')
-            return redirect(url_for('index'))  # 重定向到首页
+            return jsonify({
+                "code": 200,  # 成功状态码
+                "msg": "登录成功" # 成功提示
+            })
         else:
+            print(2)
             # 登录失败：显示错误提示
             flash('用户名或密码错误，请重新输入', 'danger')
             return redirect(url_for('login'))  # 重新显示登录页
     
     # GET请求：显示登录页面
+    print("1")
     return render_template('login.html')
-
+@app.route("/home", methods=['GET', 'POST'])
+def home():
+     return render_template('index.html')
 @app.route("/order1", methods=["POST"])
 def create_order():
     try:
@@ -131,6 +142,6 @@ def create_order():
         return jsonify({"error": "服务器内部错误"}), 500  # 返回 500，符合测试断言
 
 if __name__ == "__main__":
-    init_db()  # 启动前初始化数据库表
+    ##init_db()  # 启动前初始化数据库表
     # 监听 127.0.0.1:5000（与测试代码请求地址一致）
     app.run(host="127.0.0.1", port=5000, debug=True)
